@@ -1,5 +1,6 @@
-pathlib
-pandas
+neo4j>=5.0.0
 pymysql>=1.1.0
+pandas
 plotly>=6.0.0
 streamlit>=1.65
+pathlib
