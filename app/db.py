@@ -58,4 +58,3 @@ def execute_sp_user_analisis(params: tuple = ()):
 			return result
 	finally:
 		connect.close()
-

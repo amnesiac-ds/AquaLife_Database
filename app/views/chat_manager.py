@@ -1,8 +1,8 @@
 #!/bin/python3
 
-import streamlit as st
 import pandas as pd
-from db import connection, execute_dql
+import streamlit as st
+from db import connection
 from neo4j_db import add_comment, get_thread
 
 

@@ -137,42 +137,53 @@ incremento as (
         GROUP BY ve.IDU, ve.NombreCientifico
 ),
 usuario_reacciona as (
-    SELECT DISTINCT u.IDU, i.IDU as IDUI, DATE(r.Fecha) as Fecha
-        FROM Usuario as u
-        JOIN Reaccionar as r ON r.IDU = u.IDU
+    SELECT DISTINCT r.IDU, i.IDU as IDUI,
+            es.NombreCientifico, DATE(r.Fecha) as Fecha
+        FROM Reaccionar as r
         JOIN Publicacion as p ON p.IDPub = r.IDPub
         JOIN influencers as i ON i.IDU = p.IDU
+        JOIN especies as es ON es.IDU = i.IDU
 ),
 usuario_compra as (
-    SELECT DISTINCT u.IDU, esp.IDU as IDUI, DATE(c.Fecha) as Fecha
-        FROM Usuario as u
-        JOIN Compra as c ON c.IDUC = u.IDU
+    SELECT DISTINCT c.IDUC as IDU, esp.IDU as IDUI,
+            esp.NombreCientifico, DATE(c.Fecha) as Fecha
+        FROM Compra as c
         JOIN Especie as e ON c.IDProd = e.IDProd
         JOIN especies as esp ON esp.NombreCientifico = e.NombreCientifico
 ),
 porcentaje_conversion as (
-    SELECT ur.IDUI,
-        COUNT(DISTINCT CASE WHEN uc.IDU IS NOT NULL THEN ur.IDU END) * 100.0 
-        / COUNT(DISTINCT ur.IDU) as porcentaje_conversos
-    FROM usuario_reacciona as ur
-    LEFT JOIN usuario_compra as uc
-        ON uc.IDU = ur.IDU
-        AND uc.IDUI = ur.IDUI 
-        AND uc.Fecha BETWEEN ur.Fecha AND ur.Fecha + INTERVAL 14 DAY
-    GROUP BY ur.IDUI
+    /* Como el porcentaje de conversion da muy cerca de 100 siempre
+        evaluemos los que compraron hasta 14 dias despues de reaccionar*/
+    SELECT ur.IDUI, ur.NombreCientifico,
+            COUNT(DISTINCT ur.IDU) as reactores,
+            COUNT(DISTINCT CASE WHEN uc.IDU IS NOT NULL THEN ur.IDU END) as compradores,
+           ROUND(COUNT(DISTINCT CASE WHEN uc.IDU IS NOT NULL THEN ur.IDU END) * 100.0
+                / COUNT(DISTINCT ur.IDU), 2) as porcentaje_conversos
+        FROM usuario_reacciona as ur
+        LEFT JOIN usuario_compra as uc
+            ON uc.IDU = ur.IDU
+            AND uc.IDUI = ur.IDUI
+            AND uc.NombreCientifico = ur.NombreCientifico
+            AND uc.Fecha > ur.Fecha
+            AND uc.Fecha <= ur.Fecha + INTERVAL 14 DAY
+        GROUP BY ur.IDUI, ur.NombreCientifico
 )
-SELECT i.IDU, 
-    i.puntaje_ponderado, 
-    e.NombreCientifico, 
-    e.interacciones,
-    ROUND(inc.incremento_porcentual, 2) as incremento_porcentual, 
-    ROUND(pc.porcentaje_conversos, 2) as porcentaje_conversos
+SELECT i.IDU,
+        i.puntaje_ponderado,
+        e.NombreCientifico,
+        e.interacciones,
+        ROUND(inc.incremento_porcentual, 2) as incremento_porcentual,
+        pc.reactores,
+        pc.compradores,
+        pc.porcentaje_conversos
     FROM influencers as i
-    JOIN especies as e
-        ON e.IDU = i.IDU
+    JOIN especies as e ON e.IDU = i.IDU
     LEFT JOIN incremento as inc
-        ON inc.IDU = i.IDU 
+        ON inc.IDU = i.IDU
         AND inc.NombreCientifico = e.NombreCientifico
     LEFT JOIN porcentaje_conversion as pc
-        ON pc.IDUI = i.IDU
-    ORDER BY i.IDU, e.interacciones DESC;
+        ON pc.IDUI = e.IDU
+        AND pc.NombreCientifico = e.NombreCientifico
+    ORDER BY i.puntaje_ponderado DESC,
+                e.interacciones DESC,
+                e.NombreCientifico;

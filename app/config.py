@@ -7,6 +7,11 @@ BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 SQL_DIR = ROOT_DIR/'sql'
 
+# ===================== Neo4j =====================
+NEO4J_URI = "bolt://localhost:7687"
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD = "password"
+# =================================================
 
 CATALOG_NAMES = [
 	'Termometro de la comunidad',
