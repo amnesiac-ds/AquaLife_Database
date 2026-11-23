@@ -1,145 +1,161 @@
-# Base de Datos AquaLife - MySQL Docker
+# Base de Datos AquaLife - Docker Compose
 
-Este proyecto contiene la configuración de Docker para crear y cargar automáticamente la base de datos **AquaLife** en MySQL.
+Este proyecto contiene la configuración de Docker para levantar los servicios de base de datos usados en el proyecto AquaLife:
+
+- **MySQL** (relacional) – datos principales
+- **MongoDB** (documental) – fichas de especie jerárquicas
+- **Neo4j** (grafos) – hilos de conversación
+
+---
 
 ## Archivos
 
-- `docker-compose.yml`: Configuración de Docker Compose para construir y desplegar el contenedor MySQL y las bases de datos NoSQL (documental, grafo, columnar y llave-valor).
-- `Dockerfile`: Define cómo se construye la imagen de MySQL con la base de datos ya cargada.
+- `docker-compose.yml`: Orquesta los servicios MySQL, MongoDB y Neo4j.
+- `Dockerfile`: Construye la imagen de MySQL con `init.sql` precargado (seed 33, fecha ref 2026-01-01).
+- `generate_init_sql.py`: Genera `init.sql` reproducible (datos aleatorios, seed 33).
+- `scripts/migrate_neo4j.py`: Migra `Usuario`, `Publicacion` y `Comentar` de MySQL a Neo4j.
+- `000-hash-init.sh` / `zzz-cleanup.sh`: Verificación de hash y limpieza en el contenedor MySQL.
 - `guidelines.tex`: Orientación del proyecto.
+
+---
 
 ## Uso a través de Docker Compose
 
-1. **Construir e iniciar el contenedor**:
+### 1. Solo MySQL (desarrollo de consultas SQL)
+```bash
+docker compose up -d mysqllab
+```
 
-   ```bash
-   docker compose up -d --build
-   ```
+### 2. Las 3 BDs principales (MySQL + MongoDB + Neo4j) — **recomendado para el proyecto completo**
+```bash
+docker compose up -d mysqllab mongo neo4j
+```
 
-   La primera vez, Docker construye la imagen (puede tardar unos minutos mientras se carga la base de datos). Si quieres ver el avance del proceso en detalle:
+> **Nota**: La primera vez tarda unos minutos en construir la imagen de MySQL y cargar los datos. Para ver el progreso:
+> ```bash
+> docker compose build --progress=plain
+> docker compose up -d
+> ```
 
-   ```bash
-   docker compose build --progress=plain
-   docker compose up -d
-   ```
-2. **Verificar que la base de datos se generó correctamente**:
-   La imagen incluye un `init.sql` cuyo contenido debe ser siempre el mismo (la generación es reproducible). Comprueba su hash SHA-256 así:
+---
 
-   ```bash
-   docker run --rm --entrypoint sh aqualife-mysql:local -c \
-     "sha256sum /docker-entrypoint-initdb.d/init.sql"
-   ```
+## 2. Verificar que la base de datos MySQL se generó correctamente
 
-   El resultado esperado es:
+La imagen incluye un `init.sql` reproducible. Comprueba su hash SHA-256:
 
-   ```
-   d7a9c8df86a3ebf5cbaa20e76c23ed9d0f1b161c85684460424aeae13555c35d  /docker-entrypoint-initdb.d/init.sql
-   ```
+```bash
+docker run --rm --entrypoint sh aqualife-mysql:local -c \
+  "sha256sum /docker-entrypoint-initdb.d/init.sql"
+```
 
-   Si tu hash no coincide con este, tu imagen no se construyó igual que la de referencia (por ejemplo, si modificaste el `Dockerfile` o partiste de un checkout distinto) — reconstruye desde un clon limpio del repositorio antes de continuar.
-3. **Verificar que el contenedor está corriendo**:
+Resultado esperado (seed 33, fecha ref 2026-01-01):
+```
+d7a9c8df86a3ebf5cbaa20e76c23ed9d0f1b161c85684460424aeae13555c35d  /docker-entrypoint-initdb.d/init.sql
+```
 
-   ```bash
-   docker compose ps
-   ```
-4. **Conectarse a MySQL**:
+Si el hash no coincide, reconstruye desde un clon limpio del repositorio.
 
-   ```bash
-   docker exec -it aqualife_mysql mysql -u root -p
-   # Contraseña: root
-   ```
-5. **Detener el contenedor**:
+---
 
-   ```bash
-   docker compose down
-   ```
-6. **Detener y eliminar los datos**:
+## 3. Verificar que los contenedores están corriendo
 
-   ```bash
-   docker compose down -v
-   ```
+```bash
+docker compose ps
+```
 
-## Credenciales
+Deberías ver `aqualife_mysql` (healthy), `aqualife_mongo` y `aqualife_neo4j` en estado **Up**.
 
-| Servicio                      | Tipo de base                         | Host → Puerto                                        | Usuario / contraseña                                               |
-| ----------------------------- | ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------- |
-| `mysqllab`                  | SQL relacional (MySQL)               | `localhost:3306`                                    | `root/root` o `aqualife_user/aqualife_pass` (base `AquaLife`) |
-| `mongo`                     | NoSQL documental (MongoDB)           | `localhost:27017`                                   | `admin/password`                                                  |
-| `neo4j`                     | NoSQL de grafos (Neo4j)              | `localhost:7474` (HTTP) / `localhost:7687` (Bolt) | `neo4j/password`                                                  |
-| `monetdb`                   | NoSQL columnar (MonetDB)             | `localhost:50001`                                   | `monetdb/monetdb` (base `aqualife-db`)                          |
-| `etcd1`/`etcd2`/`etcd3` | NoSQL llave-valor (cluster etcd)     | solo red interna (`aqualife_net`)                   | sin autenticación                                                  |
-| `redis`                     | NoSQL llave-valor en memoria (Redis) | `localhost:6379`                                    | sin autenticación                                                  |
+---
 
-## Verificar que todos los servicios funcionan
+## 4. Credenciales de las 3 BDs principales
 
-Con los contenedores arriba (`docker compose up -d --build`), conéctate a cada servicio con su propio cliente y confirma que responde. Para MySQL, sigue el paso 4 de la sección anterior (conectarte con `mysql` y ejecutar cualquier consulta).
+| Servicio | Tipo | Host → Puerto | Usuario / Contraseña | Base de datos |
+|----------|------|---------------|----------------------|---------------|
+| `mysqllab` | SQL relacional (MySQL 8.0) | `localhost:3306` | `root/root` o `aqualife_user/aqualife_pass` | `AquaLife` |
+| `mongo` | NoSQL documental (MongoDB 7) | `localhost:27017` | `admin/password` (authDB: `admin`) | — |
+| `neo4j` | NoSQL grafos (Neo4j 5) | `localhost:7474` (HTTP) / `localhost:7687` (Bolt) | `neo4j/password` | — |
 
-**MongoDB (documental)**:
+---
 
+## 5. Migración MySQL → Neo4j (hilo de comentarios)
+
+Una vez que los tres contenedores estén arriba, migra los datos de `Comentar`, `Publicacion` y `Usuario` de MySQL a Neo4j:
+
+```bash
+# Migración completa (usuarios, publicaciones, 1.1M comentarios ~6 min)
+python3 scripts/migrate_neo4j.py
+
+# Solo usuarios y publicaciones (rápido, para pruebas)
+python3 scripts/migrate_neo4j.py --skip-comments
+
+# Solo verificar conteos en Neo4j
+python3 scripts/migrate_neo4j.py --verify-only
+
+# Probar sin escribir (dry-run)
+python3 scripts/migrate_neo4j.py --dry-run
+```
+
+La migración es **idempotente**: se puede ejecutar múltiples veces sin duplicar datos.
+
+---
+
+## 6. Verificar que todos los servicios funcionan
+
+### MySQL
+```bash
+docker exec -it aqualife_mysql mysql -u aqualife_user -p
+# Contraseña: aqualife_pass
+```
+
+### MongoDB
 ```bash
 docker exec -it aqualife_mongo mongosh --username admin --password password --authenticationDatabase admin --eval "db.runCommand({ ping: 1 })"
+# Respuesta: { ok: 1 }
 ```
 
-Respuesta esperada: `{ ok: 1 }`.
-
-**Neo4j (grafo)**:
-
+### Neo4j
 ```bash
 docker exec -it aqualife_neo4j cypher-shell -u neo4j -p password "RETURN 1 AS ok;"
+# Respuesta: una fila con ok = 1
 ```
 
-Respuesta esperada: una fila con `ok` = `1`.
-
-**MonetDB (columnar)**:
-
+### Verificar migración Neo4j
 ```bash
-docker exec aqualife_monetdb sh -c "printf 'user=monetdb\npassword=monetdb\n' > /tmp/.monetdb && DOTMONETDBFILE=/tmp/.monetdb mclient -d aqualife-db -s 'SELECT 1;'"
+docker exec -it aqualife_neo4j cypher-shell -u neo4j -p password "
+MATCH (u:Usuario) RETURN count(u) AS usuarios;
+MATCH (p:Publicacion) RETURN count(p) AS publicaciones;
+MATCH (c:Comentar) RETURN count(c) AS comentarios;
+"
 ```
 
-Respuesta esperada: una tabla con una fila de valor `1` seguida de `1 tuple`.
+---
 
-**etcd (llave-valor, cluster de 3 nodos)**:
-
-```bash
-docker exec aqualife_etcd1 etcdctl put ping pong
-docker exec aqualife_etcd1 etcdctl get ping
-docker exec aqualife_etcd1 etcdctl endpoint health --endpoints=http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
-```
-
-Respuesta esperada: `OK`; luego `ping` seguido de `pong`; y los tres endpoints reportando `is healthy`.
-
-**Redis (llave-valor en memoria)**:
-
-```bash
-docker exec -it aqualife_redis redis-cli ping
-```
-
-Respuesta esperada: `PONG`.
-
-## Conectar desde Jupyter Notebook
-
-Para conectarse desde un notebook Jupyter usando `ipython-sql`:
+## 7. Conectar desde Jupyter Notebook (MySQL)
 
 ```python
 %load_ext sql
 %sql mysql://root:root@localhost:3306/AquaLife
 ```
 
-O si estás usando el mismo docker compose que el notebook:
-
+O si el notebook corre en el mismo docker-compose:
 ```python
 %load_ext sql
 %sql mysql://root:root@mysqllab:3306/AquaLife
 ```
 
-## Reiniciar la base de datos
+---
 
-Si necesitas reiniciar la base de datos con los datos iniciales:
+## 8. Reiniciar la base de datos desde cero
 
 ```bash
-# Detener y eliminar el contenedor y volumen
+# Detener y eliminar contenedores y volúmenes
 docker compose down -v
 
-# Volver a iniciar
-docker compose up -d
+# Volver a levantar (solo MySQL o las 3 principales)
+docker compose up -d mysqllab
+# o
+docker compose up -d mysqllab mongo neo4j
+
+# Volver a migrar a Neo4j
+python3 scripts/migrate_neo4j.py
 ```

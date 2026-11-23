@@ -1,127 +1,142 @@
-# Para que inicien la base de datos que estaremos usando
+# AquaLife Database - Proyecto Final Bases de Datos
 
-- Le puse la default seed como 33 para no tener la que el profe da por defecto (42)
-- Todos los comandos son basados en linux, no se como pinche en windows o macos]
-- Tambien hice un todo para ir marcando lo que vayamos haciendo, revisar el archivo`todo's.md`
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-7.0-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5.0-008CC1?logo=neo4j&logoColor=white)](https://neo4j.com/)
+[![Docker](https://img.shields.io/badge/Docker-24.0-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.65-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# Comandos para que empiecen a trastear xD
+---
 
-Para iniciar el proyecto por ahora solo estaremos usando mysql asi que no es necesario cargar los demas SGBD(mongodb, neo4j etc) por lo que deben usar el siguiente comando para empezar a usar la bd
+## 📑 Índice
 
-### 1. Clonar el repo y configurar git
+- [Descripción del proyecto](#-descripción-del-proyecto)
+- [Instalación y ejecución](#-instalación-y-ejecución)
+- [Consultas SQL disponibles](#-consultas-sql-disponibles)
+- [Estructura del repositorio](#-estructura-del-repositorio)
+- [Autores](#-autores)
+- [Licencia](#-licencia)
 
-entre las comillas deben poner sus credenciales, ejemplo github_username debe ser "fcd06" para fabian
+---
 
-```Shell
-git clone https://github.com/fcd06/AquaLife_Database
-git config --global user.name "github_username"
-git config --global user.email "email_asociado_github"
+## 📖 Descripción del proyecto
+
+**AquaLife** es el proyecto final de la asignatura de Bases de Datos. Implementa un sistema de información para una comunidad acuática que combina múltiples paradigmas de bases de datos:
+
+- **Relacional (MySQL)**: Modelo principal con usuarios, publicaciones, reacciones, compras, contribuciones, especies y productos.
+- **Documental (MongoDB)**: Almacenamiento jerárquico de fichas de especie con documentos secundarios variables.
+- **Grafos (Neo4j)**: Modelo de conversaciones en hilos (comentarios y respuestas anidadas).
+
+La aplicación **Streamlit** (`app/`) proporciona un dashboard interactivo para ejecutar consultas, analizar usuarios, gestionar hilos de comentarios, explorar documentos y auditar precios.
+
+> **Nota**: Los detalles técnicos, comparativas entre SGBD y justificaciones de diseño se encuentran en el **Informe Técnico** (entregable separado).
+
+---
+
+## 🚀 Instalación y ejecución
+
+### 1. Configuración de las bases de datos
+
+Toda la configuración detallada de los servicios (MySQL, MongoDB, Neo4j), credenciales, comandos de verificación y reinicio se encuentra en el README de la base de datos:
+
+👉 **[config_database/README.md](config_database/README.md)**
+
+Allí encontrarás:
+
+- Cómo construir e iniciar los contenedores con Docker Compose
+- Credenciales y puertos de cada servicio
+- Comandos para verificar que todos responden correctamente
+- Cómo reiniciar la base de datos desde cero
+
+### 2. Aplicación Streamlit
+
+```bash
+# Instalar dependencias Python (recomendado: entorno virtual)
+pip install -r requirements.txt
+
+# Lanzar la app
+streamlit run app/main.py
 ```
 
-### 2. Para verificar que estan bien configurados usen  [[]]
+> **Importante**: En la barra lateral de la app introduce tu nombre de usuario para que funcionen los módulos de chat (Neo4j) y auditoría de precios.
 
-```Shell
-git config user.name
-git config user.email
+---
+
+## 🗃️ Consultas SQL disponibles
+
+| Archivo     | Tarea | Descripción                                                                |
+| ----------- | ----- | --------------------------------------------------------------------------- |
+| `3_a.sql` | 3.a   | Termómetro: reacciones totales por publicación con datos del post y autor |
+| `3_b.sql` | 3.b   | Publicaciones mejor recibidas: reacciones positivas vs negativas            |
+| `3_c.sql` | 3.c   | Perfil demográfico: distribución de edades en rangos de 10 años          |
+| `3_d.sql` | 3.d   | Tendencias por tipo de agua: bitácoras de mantenimiento                    |
+| `3_e.sql` | 3.e   | Top 5 vendedores mejor calificados                                          |
+| `3_f.sql` | 3.f   | Trigger `tgr_auditar_precio` + tabla `Historial_Precios`                |
+| `3_g.sql` | 3.g   | SP `sp_analisis_usuario(id_usuario, fecha_inicio, fecha_fin)`             |
+| `3_h.sql` | 3.h   | Top 5 influencers, especies top, lift de ventas, tasa conversión           |
+| `3_i.sql` | 3.i   | Detección de patrones anómalos en vendedores (Índice de Sospecha)        |
+
+Todas las consultas usan **SQL nativo** (sin ORM) y son reproducibles con la seed **33** / fecha referencia **2026-01-01**.
+
+---
+
+## 📁 Estructura del repositorio
+
+```text
+AquaLife_Database/
+├── app/                          # Aplicación Streamlit
+│   ├── main.py                   # Punto de entrada y navegación
+│   ├── config.py                 # Catálogo de consultas y rutas
+│   ├── db.py                     # Conexión a MySQL (pymysql)
+│   ├── neo4j_db.py               # Conexión y operaciones Neo4j
+│   └── views/                    # Módulos de la UI
+│       ├── home.py               # Página de bienvenida
+│       ├── query_selector.py     # Selector y ejecución de consultas SQL
+│       ├── user_analysis.py      # Análisis de usuario (sp_analisis_usuario)
+│       ├── chat_manager.py       # Gestor de hilos de comentarios (Neo4j)
+│       ├── doc_explorer.py       # Explorador de documentos jerárquicos (MongoDB)
+│       └── product_price_manager.py # Gestor de precios y auditoría
+├── config_database/              # Generación y carga de MySQL
+│   ├── generate_init_sql.py      # Script Python que genera init.sql (seed 33)
+│   ├── Dockerfile                # Imagen MySQL con init.sql precargado
+│   ├── 000-hash-init.sh          # Verifica hash SHA-256 de init.sql
+│   ├── zzz-cleanup.sh            # Limpia init.sql tras la carga
+│   └── README.md                 # Configuración detallada de BDs
+├── sql/                          # Consultas y objetos de BD
+│   ├── 3_a.sql – 3_e.sql         # Consultas básicas/intermedias
+│   ├── 3_f.sql                   # Trigger auditoría de precios
+│   ├── 3_g.sql                   # SP sp_analisis_usuario
+│   ├── 3_h.sql                   # Análisis influencers y ventas
+│   ├── 3_i.sql                   # Detección patrones anómalos vendedores
+│   └── Historial_Precios.sql     # Tabla de auditoría
+├── scripts/                      # Scripts auxiliares (ej. migración Neo4j)
+├── DOCS/                         # Documentación del proyecto
+│   ├── 260915 Orientación Proy Final.pdf
+│   └── (MERX, Informe Técnico, etc.)
+├── docker-compose.yml            # Orquestación de todos los servicios
+├── requirements.txt              # Dependencias Python
+├── todo's.md                     # Lista de tareas del proyecto
+└── README.md                     # Este archivo
 ```
 
-Les deberia salir algo como:
+---
 
-10Y6 -> su username de github
-alexmanuel1900@gmail.com -> su email asegurense que es el que tienen asociado a github
+## 👥 Autores
 
-### 3. Para iniciar el contenedor
+| Nombre (GitHub)                                        | Rol                                                                                                                                                        |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**amnesiac-ds**](https://github.com/amnesiac-ds) | **SQL completo (Ejercicio 3)**: consultas 3_a–3_i, triggers, stored procedures, fixes esquema BD, migraciones.                                      |
+| [**fcd06**](https://github.com/fcd06)             | **Neo4j completo (Ejercicio 4)**: modelo grafos, consultas Cypher, hilos de conversación, módulo Streamlit `chat_manager.py.`                    |
+| [**darioqr**](https://github.com/darioqr)         | **MongoDB completo (Ejercicio 5)**: modelo documental, fichas de especie, documentos jerárquicos, consultas, módulo Streamlit `doc_explorer.py`. |
 
-Asegurense de estar en la raiz del proyecto
+---
 
-```Shell
-cd Aqualife_Database
-```
+## 📄 Licencia
 
-Solo iniciamos mysqllab por ahora es el unico que usamos ya que aun no vemos otros tipos de bases de datos
+Este proyecto está bajo la **Licencia MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
-```Shell
-docker compose build --progress=plain      
-docker compose up -d mysqllab
-```
+---
 
-Tienen que tener internet pa esto, tengan cuidado son un poco menos de 200 mega, este paso nadamas lo hacen la primera vez
-
-### 4. Luego de esto en la terminal ya pueden empezar a usar la bd con el siguiente comando
-
-```Shell
- docker exec -it aqualife_mysql mysql -u root -p
-```
-
-en la terminal les deberia salir algo como `Enter password: ahi escriben root`y ya tienen acceso a la consola de mysql para hacer lo que quieran
-
-El prompt de la consola deberia verse algo como:
-
-```
-mysql>
-```
-
-Ahi ya pueden tirar codigo sql
-
-```SQL
-SHOW DATABASES; --Para ver las bases de datos en el contenedor
-USE AquaLife; --Para trabajar sobre la base de datos del proyecto
-CREATE DATABASE <db_name>; --Para que crear una base de datos en la que cacharrear
-```
-
-### 5. Por ultimo si quieren reiniciar los datos porque eliminaron alguna tabla o metieron en pie cacharreando
-
-Para eliminar la base de datos, la flag -v elimina los volumenes para que pueda ser regenerada de 0 la bd
-
-```Shell
-docker compose down -v
-```
-
-Para volver a iniciar la base de datos
-
-```Shell
-docker compose build --progress=plain      
-docker compose up -d mysqllab
-```
-
-Recuerden cada que quieran trastear en la base de datos hacer el comando del paso 4 en la terminal
-
-# HAGAN LO SIGUIENTE A MI ME SIRVIO
-
-el lio era que en docker-compose.yml tenia un limite maximo de mb por paquete, y como eran millones de filas que se insertaban de un palo daba error y cambie el .yml, ahora deberia funcionar, demora un poco(bastante) en ponerse ready
-
-```Shell
-# 1. Borrar todo
-docker compose down -v
-
-# 2. Iniciar y mirar el log 
-docker compose up -d --build mysqllab
-sleep 5 
-
-# 3. Sigue el log en tiempo real hasta que vean "Server is ready"
-docker logs -f aqualife_mysql --tail=100
-```
-
-Cuando les salga algo tipo, el siguiente mensaje prueben las tablas
-
-```
-2026-09-26 22:50:45+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/zzz-cleanup.sh
-rm: cannot remove '/docker-entrypoint-initdb.d/init.sql': Permission denied
-2026-09-26 22:50:45+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.46-1.el9 started.
-2026-09-26 22:50:46+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
-2026-09-26 22:50:46+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.46-1.el9 started.
-'/var/lib/mysql/mysql.sock' -> '/var/run/mysqld/mysqld.sock'
-2026-09-26T22:50:46.868294Z 0 [Warning] [MY-011068] [Server] The syntax '--skip-host-cache' is deprecated and will be removed in a future release. Please use SET GLOBAL host_cache_size=0 instead.
-2026-09-26T22:50:46.874838Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.46) starting as process 1
-2026-09-26T22:50:46.890200Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
-2026-09-26T22:50:50.325548Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
-2026-09-26T22:50:51.123604Z 0 [System] [MY-010229] [Server] Starting XA crash recovery...
-2026-09-26T22:50:51.132942Z 0 [System] [MY-010232] [Server] XA crash recovery finished.
-2026-09-26T22:50:51.751702Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
-2026-09-26T22:50:51.751775Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
-2026-09-26T22:50:51.756850Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.
-2026-09-26T22:50:51.801117Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /var/run/mysqld/mysqlx.sock
-2026-09-26T22:50:51.801322Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.0.46'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server - GPL.
-```
-
-1
+Proyecto académico para la asignatura **Bases de Datos** — Curso 2026.
