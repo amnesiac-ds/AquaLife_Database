@@ -10,11 +10,12 @@ Utiliza MERGE en Neo4j para nodos Usuario y Publicacion, y CREATE para Comentari
 (con IDComentario como clave única).
 
 Estructura en Neo4j (nombres idénticos a tablas SQL):
-  - Nodo :Usuario {IDU, NombreCompleto, Email}
+  - Nodo :Usuario {IDU, Nombre, Email}
   - Nodo :Publicacion {IDPub, Texto, FechaCreacion}
-  - Nodo :Comentar {IDComentario, Comentario, FechaCreacion}
-  - Relación (:Usuario)-[:ESCRITO_POR]->(:Comentar)
-  - Relación (:Comentar)-[:PERTENECE_A]->(:Publicacion)
+  - Nodo :Comentar {IDComentario, Comentario, FechaCreacion, IDPadre}
+  - Relación (:Usuario)-[:PUBLICO]->(:Publicacion)
+  - Relación (:Usuario)-[:ESCRIBIO]->(:Comentar)
+  - Relación (:Comentar)-[:EN_PUBLICACION]->(:Publicacion)
   - Relación (:Comentar)-[:RESPONDE_A]->(:Comentar)  [para respuestas con IDPadre]
 """
 
@@ -89,9 +90,9 @@ def crear_constraints(session) -> None:
     """Crea constraints de unicidad si no existen."""
     log("Creando constraints en Neo4j...")
     constraints = [
-        "CREATE CONSTRAINT usuario_idu IF NOT EXISTS FOR (u:Usuario) REQUIRE u.IDU IS UNIQUE",
-        "CREATE CONSTRAINT publicacion_idpub IF NOT EXISTS FOR (p:Publicacion) REQUIRE p.IDPub IS UNIQUE",
-        "CREATE CONSTRAINT comentar_idcomentario IF NOT EXISTS FOR (c:Comentar) REQUIRE c.IDComentario IS UNIQUE",
+        "CREATE CONSTRAINT usuario_id IF NOT EXISTS FOR (u:Usuario) REQUIRE u.IDU IS UNIQUE",
+        "CREATE CONSTRAINT publicacion_id IF NOT EXISTS FOR (p:Publicacion) REQUIRE p.IDPub IS UNIQUE",
+        "CREATE CONSTRAINT comentario_id IF NOT EXISTS FOR (c:Comentar) REQUIRE c.IDComentario IS UNIQUE",
     ]
     for c in constraints:
         session.run(c)
@@ -187,7 +188,7 @@ def _upsert_publicaciones_batch(session, batch: list) -> None:
         p.FechaCreacion = datetime(row.FechaCreacion)
     WITH p, row
     MATCH (u:Usuario {IDU: row.IDU})
-    MERGE (u)-[:ESCRITO_POR]->(p)
+    MERGE (u)-[:PUBLICO]->(p)
     """
     session.run(query, batch=batch)
 
@@ -230,9 +231,8 @@ def migrar_comentarios(mysql_conn, neo4j_session, batch_size: int, dry_run: bool
 
 
 def _upsert_comentarios_batch(session, batch: list) -> None:
-    """Inserta comentarios y sus relaciones.
-    Usa MERGE para Usuario y Publicacion (idempotente),
-    CREATE para Comentar (IDComentario es único).
+    """Inserta/actualiza comentarios y sus relaciones (idempotente).
+    Usa MERGE para todo: Usuario, Publicacion, Comentar.
     """
     query = """
     UNWIND $batch AS row
@@ -240,15 +240,14 @@ def _upsert_comentarios_batch(session, batch: list) -> None:
     MERGE (u:Usuario {IDU: row.IDU})
     // Asegurar que la publicación existe
     MERGE (p:Publicacion {IDPub: row.IDPub})
-    // Crear el comentario (IDComentario es único, no MERGE para evitar match costoso)
-    CREATE (c:Comentar {
-        IDComentario: row.IDComentario,
-        Comentario: row.Comentario,
-        FechaCreacion: datetime(row.FechaCreacion)
-    })
+    // Crear/actualizar el comentario (idempotente por IDComentario único)
+    MERGE (c:Comentar {IDComentario: row.IDComentario})
+    SET c.Comentario = row.Comentario,
+        c.FechaCreacion = datetime(row.FechaCreacion),
+        c.IDPadre = row.IDPadre
     // Relaciones
-    MERGE (u)-[:ESCRITO_POR]->(c)
-    MERGE (c)-[:PERTENECE_A]->(p)
+    MERGE (u)-[:ESCRIBIO]->(c)
+    MERGE (c)-[:EN_PUBLICACION]->(p)
     // Si tiene padre, crear relación RESPONDE_A
     WITH c, row
     WHERE row.IDPadre IS NOT NULL
@@ -269,9 +268,10 @@ def verificar_migracion(neo4j_session) -> dict:
         "usuarios": "MATCH (u:Usuario) RETURN count(u) AS n",
         "publicaciones": "MATCH (p:Publicacion) RETURN count(p) AS n",
         "comentarios": "MATCH (c:Comentar) RETURN count(c) AS n",
-        "rel_escrito_por": "MATCH ()-[:ESCRITO_POR]->() RETURN count(*) AS n",
-        "rel_pertenece_a": "MATCH ()-[:PERTENECE_A]->() RETURN count(*) AS n",
+        "rel_escrito": "MATCH ()-[:ESCRIBIO]->() RETURN count(*) AS n",
+        "rel_en_publicacion": "MATCH ()-[:EN_PUBLICACION]->() RETURN count(*) AS n",
         "rel_responde_a": "MATCH ()-[:RESPONDE_A]->() RETURN count(*) AS n",
+        "rel_publico": "MATCH ()-[:PUBLICO]->() RETURN count(*) AS n",
     }
     resultados = {}
     for nombre, query in queries.items():
