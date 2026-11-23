@@ -10,7 +10,7 @@
 
 ---
 
-## 📑 Índice
+## Índice
 
 - [Descripción del proyecto](#-descripción-del-proyecto)
 - [Instalación y ejecución](#-instalación-y-ejecución)
@@ -21,7 +21,7 @@
 
 ---
 
-## 📖 Descripción del proyecto
+## Descripción del proyecto
 
 **AquaLife** es el proyecto final de la asignatura de Bases de Datos. Implementa un sistema de información para una comunidad acuática que combina múltiples paradigmas de bases de datos:
 
@@ -35,13 +35,13 @@ La aplicación **Streamlit** (`app/`) proporciona un dashboard interactivo para 
 
 ---
 
-## 🚀 Instalación y ejecución
+## Instalación y ejecución
 
 ### 1. Configuración de las bases de datos
 
 Toda la configuración detallada de los servicios (MySQL, MongoDB, Neo4j), credenciales, comandos de verificación y reinicio se encuentra en el README de la base de datos:
 
-👉 **[config_database/README.md](config_database/README.md)**
+ **[config_database/README.md](config_database/README.md)**
 
 Allí encontrarás:
 
@@ -64,7 +64,7 @@ streamlit run app/main.py
 
 ---
 
-## 🗃️ Consultas SQL disponibles
+## Consultas SQL disponibles
 
 | Archivo     | Tarea | Descripción                                                                |
 | ----------- | ----- | --------------------------------------------------------------------------- |
@@ -82,7 +82,7 @@ Todas las consultas usan **SQL nativo** (sin ORM) y son reproducibles con la see
 
 ---
 
-## 📁 Estructura del repositorio
+## Estructura del repositorio
 
 ```text
 AquaLife_Database/
@@ -123,7 +123,7 @@ AquaLife_Database/
 
 ---
 
-## 👥 Autores
+## Autores
 
 | Nombre (GitHub)                                        | Rol                                                                                                                                                        |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -133,7 +133,7 @@ AquaLife_Database/
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está bajo la **Licencia MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
