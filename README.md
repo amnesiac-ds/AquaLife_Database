@@ -60,7 +60,7 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-> **Importante**: En la barra lateral de la app introduce tu nombre de usuario para que funcionen los módulos de chat (Neo4j) y auditoría de precios.
+> **Importante**: En la barra lateral de la app introduce tu nombre de usuario para los módulos de chat y auditoría de precios.
 
 ---
 
@@ -95,7 +95,7 @@ AquaLife_Database/
 │       ├── home.py               # Página de bienvenida
 │       ├── query_selector.py     # Selector y ejecución de consultas SQL
 │       ├── user_analysis.py      # Análisis de usuario (sp_analisis_usuario)
-│       ├── chat_manager.py       # Gestor de hilos de comentarios (Neo4j)
+│       ├── chat_manager.py       # Gestor y comparador de hilos (Neo4j y MySQL)
 │       ├── doc_explorer.py       # Explorador de documentos jerárquicos (MongoDB)
 │       └── product_price_manager.py # Gestor de precios y auditoría
 ├── config_database/              # Generación y carga de MySQL
@@ -110,7 +110,8 @@ AquaLife_Database/
 │   ├── 3_g.sql                   # SP sp_analisis_usuario
 │   ├── 3_h.sql                   # Análisis influencers y ventas
 │   ├── 3_i.sql                   # Detección patrones anómalos vendedores
-│   └── Historial_Precios.sql     # Tabla de auditoría
+│   ├── Historial_Precios.sql     # Tabla de auditoría
+│   └── comentarios.sql           # Esquema y procedimiento recursivo de hilos SQL
 ├── scripts/                      # Scripts auxiliares (ej. migración Neo4j)
 ├── DOCS/                         # Documentación del proyecto
 │   ├── 260915 Orientación Proy Final.pdf

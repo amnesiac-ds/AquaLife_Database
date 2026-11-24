@@ -20,38 +20,68 @@ def driver():
     return drv
 
 
-def add_comment(user_id, user_name, post_id, text, parent_comment_id=None):
+def add_comment(
+    user_id,
+    user_name,
+    post_id,
+    text,
+    comment_id,
+    created_at,
+    parent_comment_id=None,
+):
+    params = {
+        "uid": user_id,
+        "uname": user_name,
+        "pid": post_id,
+        "cid": comment_id,
+        "text": text,
+        "created": created_at.isoformat(),
+    }
+
     with driver().session() as s:
         if parent_comment_id is None:
-            s.run(
+            query = (
                 "MERGE (u:Usuario {IDU:$uid}) SET u.Nombre=$uname "
                 "MERGE (p:Publicacion {IDPub:$pid}) "
-                "CREATE (c:Comentar {IDComentario:randomUUID(), Comentario:$text, FechaCreacion:datetime()}) "
+                "MERGE (c:Comentar {IDComentario:$cid}) "
+                "SET c.Comentario=$text, c.FechaCreacion=datetime($created) "
+                "REMOVE c.IDPadre "
                 "MERGE (u)-[:ESCRIBIO]->(c) "
-                "MERGE (c)-[:EN_PUBLICACION]->(p)",
-                uid=user_id, uname=user_name, pid=post_id, text=text,
+                "MERGE (c)-[:EN_PUBLICACION]->(p)"
             )
         else:
-            s.run(
+            parent_exists = s.run(
+                "MATCH (parent:Comentar {IDComentario:$parent}) "
+                "RETURN count(parent) AS count",
+                parent=parent_comment_id,
+            ).single()["count"]
+            if not parent_exists:
+                raise ValueError("El comentario padre no existe en Neo4j.")
+
+            params["parent"] = parent_comment_id
+            query = (
+                "MATCH (parent:Comentar {IDComentario:$parent}) "
                 "MERGE (u:Usuario {IDU:$uid}) SET u.Nombre=$uname "
                 "MERGE (p:Publicacion {IDPub:$pid}) "
-                "MATCH (parent:Comentar {IDComentario:$parent}) "
-                "CREATE (c:Comentar {IDComentario:randomUUID(), Comentario:$text, FechaCreacion:datetime(), IDPadre:$parent}) "
+                "MERGE (c:Comentar {IDComentario:$cid}) "
+                "SET c.Comentario=$text, c.FechaCreacion=datetime($created), "
+                "c.IDPadre=$parent "
                 "MERGE (u)-[:ESCRIBIO]->(c) "
                 "MERGE (c)-[:EN_PUBLICACION]->(p) "
-                "MERGE (c)-[:RESPONDE_A]->(parent)",
-                uid=user_id, uname=user_name, pid=post_id, parent=parent_comment_id, text=text,
+                "MERGE (c)-[:RESPONDE_A]->(parent)"
             )
+        s.run(query, **params).consume()
 
 
 def get_thread(post_id):
     with driver().session() as s:
         res = s.run(
             "MATCH (p:Publicacion {IDPub:$pid})<-[:EN_PUBLICACION]-(root:Comentar) "
-            "MATCH (root)<-[:RESPONDE_A*0..]-(c:Comentar) "
+            "MATCH (root)<-[:RESPONDE_A*0..]-(c:Comentar)-[:EN_PUBLICACION]->(p) "
             "OPTIONAL MATCH (c)-[:RESPONDE_A]->(parent:Comentar) "
             "OPTIONAL MATCH (c)<-[:ESCRIBIO]-(u:Usuario) "
-            "RETURN DISTINCT c.IDComentario AS id, c.Comentario AS text, u.IDU AS author, c.FechaCreacion AS created, "
+            "RETURN DISTINCT c.IDComentario AS id, c.Comentario AS text, "
+            "u.Nombre AS author, c.FechaCreacion AS created, "
             "parent.IDComentario AS parent_id",
             pid=post_id,
         )
