@@ -1,3 +1,2 @@
 .aqualife_venv
-config_database/__pycache__
-app/__pycache__
+__pycache__/
