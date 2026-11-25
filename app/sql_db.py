@@ -1,9 +1,9 @@
+#!/bin/python3
 from datetime import datetime
 
 import pymysql
 
 from db import connection
-
 
 def add_comment(
     user_name: str,
