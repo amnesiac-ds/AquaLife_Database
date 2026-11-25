@@ -90,8 +90,10 @@ especies as (
 eventos as (
     SELECT IDU, DATE(Fecha) as Fecha
     FROM (
-        SELECT p.IDU, p.FechaCreacion as Fecha
+
+        SELECT p.IDU, r.Fecha as Fecha
             FROM Publicacion as p
+            JOIN Reaccionar as r ON r.IDPub = p.IDPub
             JOIN influencers as i ON i.IDU = p.IDU
         UNION
         SELECT c.IDU, Fecha

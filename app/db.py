@@ -20,7 +20,7 @@ def connection():
 def execute_dql(name: str):
 	connect = connection()
 
-	sql = (SQL_DIR/name).read_text()
+	sql = (SQL_DIR/name).read_text(encoding='utf-8')
 	try:
 		result = pd.read_sql(sql,connect)
 		return result
