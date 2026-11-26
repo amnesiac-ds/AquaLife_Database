@@ -27,12 +27,11 @@ def conectar_mongo():
 # Extraccion de datos de MySQL 
 
 def obtener_especies_mysql(conn):
-    print("Obteniendo 5 especies de MySQL...")
+    print("Obteniendo todas las especies de MySQL...")
     with conn.cursor() as cursor:
         consulta = """SELECT e.IDProd, e.NombreComun, e.NombreCientifico, e.Categoria, p.Descripcion
         FROM Especie e
-        JOIN Producto p ON e.IDProd = p.IDProd
-        LIMIT 5;"""
+        JOIN Producto p ON e.IDProd = p.IDProd;"""
         
         cursor.execute(consulta)
         return cursor.fetchall()

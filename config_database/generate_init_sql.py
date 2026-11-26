@@ -523,119 +523,53 @@ def gen_publicaciones(n, n_usuarios, n_videos, f):
 
 
 def gen_comentar(n, n_usuarios, n_publicaciones, f):
-    """Genera comentarios nivel por nivel, liberando memoria de niveles anteriores.
-    Yield batches (listas de tuplas) para write_batch."""
     log("Generando Comentar...")
     n_raiz = int(n * 0.6)
-    n_respuestas = n - n_raiz
-    
     next_cid = 1
     batch = []
-    
-    def flush_batch():
-        if batch:
-            yield batch
-            batch.clear()
-    
-    log("  Generando raíces (nivel 0)...")
-    raices_por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
-    
-    for i in range(n_raiz):
+
+    # Pool de comentarios por publicación: (id, nivel, fecha)
+    por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
+
+    def rand_fecha(minimo=None):
+        # Fecha posterior (o igual) a la del padre
+        d_max = 5 * 365
+        if minimo is None:
+            dias = random.randint(1, d_max)
+        else:
+            dias = random.randint(1, max(1, (REFERENCE_DATE - minimo).days))
+        fecha = REFERENCE_DATE - timedelta(days=dias)
+        return fecha
+
+    def fmt(fecha):
+        return (fecha.isoformat() +
+                f" {random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}")
+
+    for i in range(n):
         cid = next_cid
         next_cid += 1
-        id_u = random.randint(1, n_usuarios)
         id_pub = random.randint(1, n_publicaciones)
-        fecha = random_date(1, 5 * 365)
-        fecha_str = fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"
-        
-        batch.append((cid, random.randint(1, n_usuarios), id_pub, None, random.choice(COMENTARIOS_POOL),
-                      fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"))
-        
-        raices_por_pub[id_pub].append(next_cid - 1)
-        
+        pool = por_pub[id_pub]
+
+        if i < n_raiz or not pool:
+            padre, nivel, fecha = None, 0, rand_fecha()
+        else:
+            padre_id, padre_nivel, padre_fecha = random.choice(pool)
+            padre, nivel = padre_id, padre_nivel + 1
+            fecha = rand_fecha(minimo=padre_fecha)
+
+        pool.append((cid, nivel, fecha))
+        batch.append((cid, random.randint(1, n_usuarios), id_pub, padre,
+                      random.choice(COMENTARIOS_POOL), fmt(fecha)))
+
         if len(batch) >= BATCH_SIZE:
             yield batch
-            batch.clear()
-        
-        log_progress(next_cid - 1, n_raiz, cada=100000, prefijo="Raíces: ")
-    
-    # Raíces done
-    if batch:
-        yield batch
-        batch.clear()
-    
-    log(f"  Raíces completadas: {n_raiz:,}")
-    
-    # Respuestas nivel por nivel
-    padres_nivel_actual = {pub: list(cids) for pub, cids in raices_por_pub.items()}
-    nivel = 1
-    n_raiz_total = n_raiz
-    n_respuestas = n - n_raiz
-    total_escritos = n_raiz
-    n_respuestas_total = n - n_raiz
-    
-    while total_escritos < n:
-        log(f"  Generando nivel {nivel}...")
-        hijos_por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
-        pendientes_nivel = min(n - total_escritos, n_raiz * (2 ** nivel) // 2)
-        
-        respuestas_por_pub = {}
-        total_raices = sum(len(v) for v in padres_nivel_actual.values())
-        if total_raices == 0:
-            break
-            
-        for pub, padres in padres_nivel_actual.items():
-            if not padres:
-                continue
-            propor = len(padres) / total_raices
-            pend = int(pendientes_nivel * propor)
-            if pend > 0:
-                respuestas_por_pub[pub] = min(pend, len(padres) * 5)
-        
-        if sum(respuestas_por_pub.values()) < n - total_escritos:
-            for pub in range(1, n_publicaciones + 1):
-                if respuestas_por_pub.get(pub, 0) < 100 and padres_nivel_actual.get(pub):
-                    respuestas_por_pub[pub] = respuestas_por_pub.get(pub, 0) + 10
-        
-        for pub, num_respuestas in respuestas_por_pub.items():
-            padres = padres_nivel_actual[pub]
-            if not padres:
-                continue
-            
-            for _ in range(num_respuestas):
-                if total_escritos >= n:
-                    break
-                
-                id_padre = random.choice(padres)
-                fecha = random_date(1, 5 * 365)
-                fecha_str = fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"
-                cid = next_cid
-                next_cid += 1
-                total_escritos += 1
-                
-                batch.append((cid, random.randint(1, n_usuarios), pub, id_padre, random.choice(COMENTARIOS_POOL),
-                              fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"))
-                
-                if len(batch) >= BATCH_SIZE:
-                    yield batch
-                    batch.clear()
-                
-                log_progress(total_escritos, n, cada=100000, prefijo=f"Nivel {nivel}: ")
-        
-        # Preparar siguiente nivel
-        # Reconstruir hijos_por_pub desde lo que se escribió
-        # (simplificación: los últimos N items del batch son de este nivel)
-        # Para simplificar, reconstruimos hijos_por_pub iterando sobre los últimos items
-        # En producción real se guardaría durante el loop
-        nivel += 1
-        if total_escritos >= n:
-            break
-    
-    if batch:
-        yield batch
-    
-    log(f"  Comentarios generados: {total_escritos:,} (profundidad máx: {nivel-1})")
+            batch = []
+        log_progress(i + 1, n, cada=100000, prefijo="Comentar: ")
 
+    if batch:
+        yield batch
+    
 
 def gen_reaccionar(n, n_usuarios, n_publicaciones, f):
     log("Generando Reaccionar...")
@@ -1023,6 +957,67 @@ CREATE PROCEDURE sp_analisis_usuario(
                 LIMIT 1
             ) as especie_mas_vendida;
     END //
+
+-- Ejercicio 4 comentarios recursivos
+
+
+ALTER TABLE Usuario
+    MODIFY COLUMN IDU INT(11) NOT NULL AUTO_INCREMENT,
+    MODIFY COLUMN Nombre VARCHAR(50) NOT NULL,
+    MODIFY COLUMN DireccionParticular VARCHAR(50) NULL,
+    MODIFY COLUMN Email VARCHAR(50) NULL,
+    MODIFY COLUMN FechaDeNacimiento DATE NULL,
+    MODIFY COLUMN Notificaciones CHAR(17) NULL,
+    MODIFY COLUMN ConfiguracionDePrivacidad CHAR(30) NULL;
+
+DROP PROCEDURE IF EXISTS sp_obtener_hilo_comentarios;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_obtener_hilo_comentarios(IN p_IDPub INT)
+BEGIN
+    WITH RECURSIVE Hilo AS (
+        SELECT
+            c.IDComentario,
+            c.IDU,
+            c.IDPub,
+            c.IDPadre,
+            c.Comentario,
+            c.FechaCreacion,
+            0 AS Nivel
+        FROM Comentar AS c
+        WHERE c.IDPub = p_IDPub
+          AND c.IDPadre IS NULL
+
+        UNION ALL
+
+        SELECT
+            respuesta.IDComentario,
+            respuesta.IDU,
+            respuesta.IDPub,
+            respuesta.IDPadre,
+            respuesta.Comentario,
+            respuesta.FechaCreacion,
+            hilo.Nivel + 1
+        FROM Comentar AS respuesta
+        INNER JOIN Hilo AS hilo
+            ON respuesta.IDPadre = hilo.IDComentario
+           AND respuesta.IDPub = hilo.IDPub
+    )
+    SELECT
+        hilo.IDComentario AS id,
+        hilo.IDPadre AS parent_id,
+        hilo.Comentario AS text,
+        usuario.Nombre AS author,
+        hilo.FechaCreacion AS created,
+        hilo.Nivel AS level
+    FROM Hilo AS hilo
+    INNER JOIN Usuario AS usuario
+        ON usuario.IDU = hilo.IDU
+    ORDER BY hilo.IDComentario;
+END$$
+
+DELIMITER ;
 
 DELIMITER ;
 """.strip()
