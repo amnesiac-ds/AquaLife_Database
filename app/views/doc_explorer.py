@@ -24,8 +24,8 @@ def get_species_list():
     """Obtiene lista de especies con ID y nombre para el selector."""
     col = get_collection()
     pipeline = [
-        {"$project": {"_id": 1, "nombre_cientifico": 1, "nombre_comun": 1}},
-        {"$sort": {"nombre_cientifico": 1}}
+        {"$project": {"IDProd": 1, "NombreCientifico": 1, "NombreComun": 1}},
+        {"$sort": {"NombreCientifico": 1}}
     ]
     return list(col.aggregate(pipeline))
 
@@ -33,7 +33,7 @@ def get_species_list():
 def get_ficha(especie_id):
     """Obtiene la ficha completa de una especie por ID (numérico, IDProd de MySQL)."""
     col = get_collection()
-    return col.find_one({"_id": int(especie_id)})
+    return col.find_one({"IDProd": int(especie_id)})
 
 
 def render_document(doc, nivel=0, titulo=None):
@@ -46,7 +46,7 @@ def render_document(doc, nivel=0, titulo=None):
     
     if isinstance(doc, dict):
         for key, value in doc.items():
-            if key == "_id":
+            if key in ("_id", "IDProd"):
                 continue
             if isinstance(value, (dict, list)):
                 with st.expander(f"{'&nbsp;&nbsp;&nbsp;&nbsp;' * nivel}{key}", expanded=(nivel < 2)):
@@ -80,7 +80,7 @@ def render():
         return
 
     # Selector de especie
-    species_options = {f"{s.get('nombre_comun', '')} ({s.get('nombre_cientifico', '')})": str(s["_id"]) for s in species_list}
+    species_options = {f"{s.get('NombreComun', '')} ({s.get('NombreCientifico', '')})": str(s["IDProd"]) for s in species_list}
     selected_label = st.selectbox("Seleccionar especie", options=list(species_options.keys()))
     especie_id = species_options[selected_label]
 
@@ -95,23 +95,23 @@ def render():
     st.subheader("Ficha Principal")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"**Nombre científico:** {ficha.get('nombre_cientifico', 'N/A')}")
-        st.markdown(f"**Nombre común:** {ficha.get('nombre_comun', 'N/A')}")
+        st.markdown(f"**Nombre científico:** {ficha.get('NombreCientifico', 'N/A')}")
+        st.markdown(f"**Nombre común:** {ficha.get('NombreComun', 'N/A')}")
     with col2:
-        st.markdown(f"**Categoría:** {ficha.get('categoria', 'N/A')}")
-        st.markdown(f"**ID MongoDB:** `{ficha['_id']}`")
+        st.markdown(f"**Categoría:** {ficha.get('Categoria', 'N/A')}")
+        st.markdown(f"**IDProd:** `{ficha['IDProd']}`")
 
     # Documentos secundarios jerárquicos
     st.divider()
     st.subheader("Documentos Secundarios (Jerárquicos)")
 
-    docs_secundarios = ficha.get("documentos_secundarios", [])
+    docs_secundarios = ficha.get("DocumentosSecundarios", [])
     
     if not docs_secundarios:
         st.info("Esta especie no tiene documentos secundarios registrados.")
     else:
         for i, subdoc in enumerate(docs_secundarios):
-            with st.expander(f"📄 {subdoc.get('tipo', f'Documento {i+1}')}", expanded=False):
+            with st.expander(f"📄 {subdoc.get('Tipo', f'Documento {i+1}')}", expanded=False):
                 render_document(subdoc, 0)
 
 

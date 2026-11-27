@@ -85,6 +85,9 @@ def add_comment(
 
 
 def get_thread(post_id):
+    # Se devuelve el hilo completo como una sola fila con una lista de mapas.
+    # Asi el driver decodifica un registro en lugar de miles, que es el
+    # cuello de botella al recuperar hilos grandes.
     with driver().session() as s:
         res = s.run(
             """
@@ -92,23 +95,21 @@ def get_thread(post_id):
                 <-[:EN_PUBLICACION]-(root:Comentar)
             WHERE NOT (root)-[:RESPONDE_A]->()
 
-            MATCH path = (c:Comentar)-[:RESPONDE_A*0..]->(root)
-            MATCH (c)-[:EN_PUBLICACION]->(p)
-
-            OPTIONAL MATCH (c)-[:RESPONDE_A]->(parent:Comentar)
+            MATCH path = (root)<-[:RESPONDE_A*0..]-(c:Comentar)
             OPTIONAL MATCH (c)<-[:ESCRIBIO]-(u:Usuario)
 
-            RETURN
-                c.IDComentario AS id,
-                parent.IDComentario AS parent_id,
-                c.Comentario AS text,
-                u.Nombre AS author,
-                c.FechaCreacion AS created,
-                length(path) AS level
-
-            ORDER BY id
+            WITH c, u, length(path) AS level
+            ORDER BY c.IDComentario
+            RETURN collect({
+                id: c.IDComentario,
+                parent_id: c.IDPadre,
+                text: c.Comentario,
+                author: u.Nombre,
+                created: toString(c.FechaCreacion),
+                level: level
+            }) AS rows
             """,
             pid=post_id,
         )
-
-        return [r.data() for r in res]
+        record = res.single()
+        return record["rows"] if record else []
