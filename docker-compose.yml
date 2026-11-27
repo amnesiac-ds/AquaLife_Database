@@ -6,12 +6,12 @@ services:
     restart: unless-stopped
     command:
       - --max-allowed-packet=512M
-      # Optimizaciones para la carga masiva de init.sql (~7M filas).
+      # Configuración duradera (producción). La carga inicial ya ocurrió al construir la imagen.
       - --innodb-buffer-pool-size=512M
       - --innodb-redo-log-capacity=512M
       - --innodb-flush-method=O_DIRECT
-      - --innodb-flush-log-at-trx-commit=2
-      - --sync-binlog=0
+      - --innodb-flush-log-at-trx-commit=1
+      - --sync-binlog=1
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: AquaLife
@@ -32,7 +32,7 @@ services:
   # NoSQL orientado a documentos (MongoDB) - respalda la Tarea 5 (documentación
   # jerárquica de especies: ficha principal + documentos secundarios).
   mongo:
-    image: mongo:latest
+    image: mongo:7
     container_name: aqualife_mongo
     restart: unless-stopped
     environment:
@@ -48,7 +48,7 @@ services:
   # NoSQL orientado a grafos (Neo4j) - respalda la Tarea 4.b (modelo alternativo
   # de conversaciones en hilos de comentarios).
   neo4j:
-    image: neo4j:latest
+    image: neo4j:5
     container_name: aqualife_neo4j
     restart: unless-stopped
     environment:

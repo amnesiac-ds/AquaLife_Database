@@ -1090,6 +1090,66 @@ def build_sql_streaming(config, seed=None, output_path="init.sql"):
         # DDL
         f.write(DDL + "\n\n")
         
+        # Índices adicionales (prioridad >= 8) para optimizar consultas analíticas y SP
+        # Ver análisis en informe_aqualife.tex sección 3.5 y config_database/README.md
+        indices_adicionales = """
+-- ============================================================
+-- ÍNDICES ADICIONALES (prioridad >= 8)
+-- Creados tras la carga masiva para optimizar consultas y SP
+-- ============================================================
+
+-- 1. Comentar(IDPub, IDPadre) — Prioridad 10/10
+-- Crítico para CTE recursivo sp_obtener_hilo_comentarios:
+-- caso base WHERE IDPub = ? AND IDPadre IS NULL
+-- JOIN recursivo ON respuesta.IDPadre = hilo.IDComentario AND respuesta.IDPub = hilo.IDPub
+CREATE INDEX idx_comentar_pub_padre ON Comentar (IDPub, IDPadre);
+
+-- 2. Compra(IDUV, IDProd, Fecha) — Prioridad 9/10
+-- Consultas 3_e.sql (top vendedores), 3_i.sql (variación_mensual, resumen_calificaciones)
+-- Agrupación por vendedor + producto + fecha
+CREATE INDEX idx_compra_uv_prod_fecha ON Compra (IDUV, IDProd, Fecha);
+
+-- 3. Compra(IDUC, Fecha) — Prioridad 9/10
+-- SP sp_analisis_usuario: total_compras + monto_gastado por usuario en rango de fechas
+CREATE INDEX idx_compra_uc_fecha ON Compra (IDUC, Fecha);
+
+-- 4. Publicacion(IDU, FechaCreacion) — Prioridad 9/10
+-- SP sp_analisis_usuario: total_publicaciones por usuario en rango de fechas
+CREATE INDEX idx_publicacion_usuario_fecha ON Publicacion (IDU, FechaCreacion);
+
+-- 5. Reaccionar(IDU, Fecha) — Prioridad 9/10
+-- SP sp_analisis_usuario: total_reacciones_dadas por usuario en rango de fechas
+CREATE INDEX idx_reaccionar_usuario_fecha ON Reaccionar (IDU, Fecha);
+
+-- 6. Comentar(IDU, FechaCreacion) — Prioridad 9/10
+-- SP sp_analisis_usuario: total_comentarios por usuario en rango de fechas
+CREATE INDEX idx_comentar_usuario_fecha ON Comentar (IDU, FechaCreacion);
+
+-- 7. Contribucion(IDU, Fecha) — Prioridad 9/10
+-- SP sp_analisis_usuario: total_contribuciones por usuario en rango de fechas
+CREATE INDEX idx_contribucion_usuario_fecha ON Contribucion (IDU, Fecha);
+
+-- 8. Reaccionar(IDPub) — Prioridad 8/10
+-- Consultas 3_a, 3_b, 3_h: JOIN Reaccionar.IDPub = Publicacion.IDPub
+-- (FK no crea índice automáticamente en MySQL 8 para la tabla referenciada)
+CREATE INDEX idx_reaccionar_publicacion ON Reaccionar (IDPub);
+
+-- 9. Contribucion(IDProd) — Prioridad 8/10
+-- Consultas 3_d, 3_h: JOIN Contribucion.IDProd = Especie.IDProd
+CREATE INDEX idx_contribucion_especie ON Contribucion (IDProd);
+
+-- 10. Especie(IDTA) — Prioridad 8/10
+-- Consulta 3_d: JOIN Especie.IDTA = TipoAgua.IDTA
+CREATE INDEX idx_especie_tipoagua ON Especie (IDTA);
+
+-- 11. Compra(IDUV, Puntuacion) — Prioridad 8/10
+-- Consultas 3_i (resumen_calificaciones), 3_e (top vendedores)
+-- Agrupación y filtro por puntuaciones 1-5
+CREATE INDEX idx_compra_vendedor_puntuacion ON Compra (IDUV, Puntuacion);
+
+"""
+        f.write(indices_adicionales)
+        
         # Usuarios
         usuarios = gen_usuarios(config["usuarios"], None)
         f.write("-- Insertar datos en Usuario\n")
