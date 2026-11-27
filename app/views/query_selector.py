@@ -38,4 +38,3 @@ with st.spinner('Ejecutando..'):
 				st.dataframe(tabla, use_container_width=True, hide_index=True)
 	else:
 		st.dataframe(df, use_container_width=True)
-

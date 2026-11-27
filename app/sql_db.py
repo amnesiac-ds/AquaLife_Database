@@ -5,6 +5,7 @@ import pymysql
 
 from db import connection
 
+
 def add_comment(
     user_name: str,
     post_id: int,

@@ -40,7 +40,7 @@ def _add_comment_to_both(user_name, post_id, text, parent_comment_id=None):
 
 def render():
     st.title("Gestor de chats / hilos de comentarios")
-    st.caption("Muestra el hilo y compara automáticamente los tiempos de Neo4j y SQL.")
+    st.caption("Comenta publicaciones y responde a comentarios creando hilos.")
 
     conn = connection()
     try:
@@ -65,9 +65,9 @@ def render():
     with st.form("new_post_comment"):
         txt = st.text_area("Comentario")
         if st.form_submit_button("Comentar post") and txt.strip():
-            if _add_comment_to_both(user_name, post_id, txt.strip()):
-                st.success("Comentario agregado y sincronizado.")
-                st.rerun()
+            _add_comment_to_both(user_name, post_id, txt.strip())
+            st.success("Comentario agregado.")
+            st.rerun()
 
     st.subheader("Hilo de comentarios")
     thread_loaders = {
@@ -104,32 +104,21 @@ def render():
 
     def render_comment(c, level=0):
         prefix = "↳ " if level else ""
-        fecha = escape(str(c.get("created", ""))[:16].replace("T", " "))
-        nombre_autor = str(c.get("author") or "?")
+        fecha = str(c.get("created", ""))[:16].replace("T", " ")
+        nombre_autor = str(c.get("author", "?"))
         autor = escape(nombre_autor)
         texto = escape(str(c["text"])).replace("\n", "<br>")
         st.markdown(
-            f'<div style="margin-left: {level * 24}px;">'
-            f'{prefix}<strong>{autor}</strong> ({fecha}): {texto}</div>',
+            f"{'&nbsp;&nbsp;&nbsp;&nbsp;' * level}{prefix}**{autor}** ({fecha}): {texto}",
             unsafe_allow_html=True,
         )
-        with st.expander(f"Responder a {nombre_autor}", expanded=False):
+        with st.expander(f"Responder a {autor}", expanded=False):
             with st.form(f"reply_{c['id']}"):
                 rtxt = st.text_area("Respuesta", key=f"rtxt_{c['id']}")
                 if st.form_submit_button("Responder") and rtxt.strip():
-                    try:
-                        added = _add_comment_to_both(
-                            user_name,
-                            post_id,
-                            rtxt.strip(),
-                            parent_comment_id=c["id"],
-                        )
-                    except ValueError as error:
-                        st.error(str(error))
-                        return
-                    if added:
-                        st.success("Respuesta agregada y sincronizada.")
-                        st.rerun()
+                    _add_comment_to_both(user_name, post_id, rtxt.strip(), parent_comment_id=c["id"])
+                    st.success("Respuesta agregada.")
+                    st.rerun()
         for child in by_parent.get(c["id"], []):
             render_comment(child, level + 1)
 
@@ -137,4 +126,5 @@ def render():
         render_comment(c)
 
 
-render()
+if __name__ == "__main__":
+    render()

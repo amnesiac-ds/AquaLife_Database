@@ -523,53 +523,99 @@ def gen_publicaciones(n, n_usuarios, n_videos, f):
 
 
 def gen_comentar(n, n_usuarios, n_publicaciones, f):
+    """Genera comentarios jerárquicos nivel por nivel, liberando memoria de niveles previos."""
     log("Generando Comentar...")
     n_raiz = int(n * 0.6)
+    n_respuestas = n - n_raiz
+    
     next_cid = 1
+    BATCH_SIZE = 50000
+    
+    # 1. RAÍCES (nivel 0) - 60%
+    log("  Generando raíces (nivel 0)...")
     batch = []
-
-    # Pool de comentarios por publicación: (id, nivel, fecha)
-    por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
-
-    def rand_fecha(minimo=None):
-        # Fecha posterior (o igual) a la del padre
-        d_max = 5 * 365
-        if minimo is None:
-            dias = random.randint(1, d_max)
-        else:
-            dias = random.randint(1, max(1, (REFERENCE_DATE - minimo).days))
-        fecha = REFERENCE_DATE - timedelta(days=dias)
-        return fecha
-
-    def fmt(fecha):
-        return (fecha.isoformat() +
-                f" {random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}")
-
-    for i in range(n):
+    raices_por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
+    
+    for i in range(n_raiz):
+        id_u = random.randint(1, n_usuarios)
+        id_pub = random.randint(1, n_publicaciones)
         cid = next_cid
         next_cid += 1
-        id_pub = random.randint(1, n_publicaciones)
-        pool = por_pub[id_pub]
-
-        if i < n_raiz or not pool:
-            padre, nivel, fecha = None, 0, rand_fecha()
-        else:
-            padre_id, padre_nivel, padre_fecha = random.choice(pool)
-            padre, nivel = padre_id, padre_nivel + 1
-            fecha = rand_fecha(minimo=padre_fecha)
-
-        pool.append((cid, nivel, fecha))
-        batch.append((cid, random.randint(1, n_usuarios), id_pub, padre,
-                      random.choice(COMENTARIOS_POOL), fmt(fecha)))
-
-        if len(batch) >= BATCH_SIZE:
-            yield batch
-            batch = []
-        log_progress(i + 1, n, cada=100000, prefijo="Comentar: ")
-
-    if batch:
-        yield batch
+        
+        fecha = random_date(1, 5 * 365)
+        fecha_str = fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"
+        
+        yield [(cid, id_u, id_pub, None, random.choice(COMENTARIOS_POOL), fecha_str)]
+        raices_por_pub[id_pub].append(cid)
+        
+        log_progress(next_cid - 1, n_raiz, cada=100000, prefijo="Raíces: ")
     
+    log(f"  Raíces completadas: {n_raiz:,}")
+    
+    # 2. RESPUESTAS NIVEL POR NIVEL - liberando memoria de niveles previos
+    padres_nivel_actual = raices_por_pub
+    nivel = 1
+    total_escritos = n_raiz
+    n_respuestas = n - n_raiz
+    
+    while total_escritos < n:
+        log(f"  Generando nivel {nivel}...")
+        hijos_por_pub = {pub: [] for pub in range(1, n_publicaciones + 1)}
+        pendientes_nivel = min(n - total_escritos, n_raiz * (2 ** nivel) // 2)
+        
+        respuestas_por_pub = {}
+        total_raices = sum(len(v) for v in padres_nivel_actual.values())
+        if total_raices == 0:
+            break
+            
+        for pub, padres in padres_nivel_actual.items():
+            if not padres:
+                continue
+            propor = len(padres) / total_raices
+            pend = int(pendientes_nivel * propor)
+            if pend > 0:
+                respuestas_por_pub[pub] = min(pend, len(padres) * 5)
+        
+        # Asegurar que se cubran todas las respuestas
+        if sum(respuestas_por_pub.values()) < n - total_escritos:
+            for pub in range(1, n_publicaciones + 1):
+                if respuestas_por_pub.get(pub, 0) < 100 and padres_nivel_actual.get(pub):
+                    respuestas_por_pub[pub] = respuestas_por_pub.get(pub, 0) + 10
+        
+        for pub, num_respuestas in respuestas_por_pub.items():
+            padres = padres_nivel_actual[pub]
+            if not padres:
+                continue
+            
+            for _ in range(num_respuestas):
+                if total_escritos >= n:
+                    break
+                
+                id_padre = random.choice(padres)
+                id_u = random.randint(1, n_usuarios)
+                fecha = random_date(1, 5 * 365)
+                fecha_str = fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}"
+                cid = next_cid
+                next_cid += 1
+                total_escritos += 1
+                
+                yield [(cid, id_u, pub, id_padre, random.choice(COMENTARIOS_POOL),
+                       fecha.isoformat() + " " + f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:{random.randint(0,59):02d}")]
+                
+                hijos_por_pub[pub].append(cid)
+                
+                log_progress(total_escritos, n, cada=100000, prefijo=f"Nivel {nivel}: ")
+        
+        # Liberar memoria del nivel anterior
+        padres_nivel_actual = hijos_por_pub
+        nivel += 1
+        
+        if not any(padres_nivel_actual.values()):
+            break
+    
+    log(f"  Comentarios generados: {total_escritos:,} (profundidad máx: {nivel-1})")
+
+
 
 def gen_reaccionar(n, n_usuarios, n_publicaciones, f):
     log("Generando Reaccionar...")
@@ -675,6 +721,12 @@ DDL = """
 -- Configurar el charset
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
+
+-- Optimizaciones para la carga masiva inicial (solo afectan a esta sesion).
+-- Se restauran al final del archivo, despues de insertar todos los datos.
+SET sql_log_bin = 0;
+SET unique_checks = 0;
+SET foreign_key_checks = 0;
 
 -- Crear y usar la base de datos AquaLife
 CREATE DATABASE IF NOT EXISTS AquaLife CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -958,6 +1010,7 @@ CREATE PROCEDURE sp_analisis_usuario(
             ) as especie_mas_vendida;
     END //
 
+DELIMITER ;
 -- Ejercicio 4 comentarios recursivos
 
 
@@ -972,7 +1025,7 @@ ALTER TABLE Usuario
 
 DROP PROCEDURE IF EXISTS sp_obtener_hilo_comentarios;
 
-DELIMITER $$
+DELIMITER //
 
 CREATE PROCEDURE sp_obtener_hilo_comentarios(IN p_IDPub INT)
 BEGIN
@@ -1015,11 +1068,10 @@ BEGIN
     INNER JOIN Usuario AS usuario
         ON usuario.IDU = hilo.IDU
     ORDER BY hilo.IDComentario;
-END$$
+END //
 
 DELIMITER ;
 
-DELIMITER ;
 """.strip()
 
 
@@ -1127,6 +1179,12 @@ def build_sql_streaming(config, seed=None, output_path="init.sql"):
         contribucion_video = gen_contribucion_media(config["contribucion_video"], contribucion_keys, config["videos"], None, "Contribucion_Video")
         f.write("\n-- Insertar datos en Contribucion_Video\n")
         write_batch(f, "Contribucion_Video", ["IDProd", "Fecha", "IDV"], contribucion_video)
+
+        # Restaurar las comprobaciones al terminar la carga.
+        f.write("\n-- Restaurar comprobaciones\n")
+        f.write("SET unique_checks = 1;\n")
+        f.write("SET foreign_key_checks = 1;\n")
+        f.write("SET sql_log_bin = 1;\n")
         
         log(f"Listo. Archivo generado: {output_path}")
 

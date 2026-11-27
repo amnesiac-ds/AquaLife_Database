@@ -102,7 +102,7 @@ conn_mysql = conectar_mysql()
 client_mongo = conectar_mongo()
 
 db_mongo = client_mongo['AquaLifeDoc']
-coleccion_mongo = db_mongo['fichas_especies']
+coleccion_mongo = db_mongo['fichas_especie']
 
 # limpiamos la coleccion 
 coleccion_mongo.delete_many({})

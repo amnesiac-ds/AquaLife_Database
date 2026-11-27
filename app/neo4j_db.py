@@ -9,6 +9,7 @@ from config import (
     NEO4J_PASSWORD
 )
 
+
 @st.cache_resource
 def driver():
     drv = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
@@ -51,10 +52,19 @@ def add_comment(
             )
         else:
             parent_exists = s.run(
-                "MATCH (parent:Comentar {IDComentario:$parent}) "
-                "RETURN count(parent) AS count",
+                """
+                MATCH (parent:Comentar {IDComentario: $parent})
+                    -[:EN_PUBLICACION]->(p:Publicacion {IDPub: $pid})
+                RETURN count(parent) AS count
+                """,
                 parent=parent_comment_id,
+                pid=post_id,
             ).single()["count"]
+
+            if not parent_exists:
+                raise ValueError(
+                    "El comentario padre no existe en esa publicación."
+                )
             if not parent_exists:
                 raise ValueError("El comentario padre no existe en Neo4j.")
 
@@ -73,16 +83,32 @@ def add_comment(
         s.run(query, **params).consume()
 
 
+
 def get_thread(post_id):
     with driver().session() as s:
         res = s.run(
-            "MATCH (p:Publicacion {IDPub:$pid})<-[:EN_PUBLICACION]-(root:Comentar) "
-            "MATCH (root)<-[:RESPONDE_A*0..]-(c:Comentar)-[:EN_PUBLICACION]->(p) "
-            "OPTIONAL MATCH (c)-[:RESPONDE_A]->(parent:Comentar) "
-            "OPTIONAL MATCH (c)<-[:ESCRIBIO]-(u:Usuario) "
-            "RETURN DISTINCT c.IDComentario AS id, c.Comentario AS text, "
-            "u.Nombre AS author, c.FechaCreacion AS created, "
-            "parent.IDComentario AS parent_id",
+            """
+            MATCH (p:Publicacion {IDPub: $pid})
+                <-[:EN_PUBLICACION]-(root:Comentar)
+            WHERE NOT (root)-[:RESPONDE_A]->()
+
+            MATCH path = (c:Comentar)-[:RESPONDE_A*0..]->(root)
+            MATCH (c)-[:EN_PUBLICACION]->(p)
+
+            OPTIONAL MATCH (c)-[:RESPONDE_A]->(parent:Comentar)
+            OPTIONAL MATCH (c)<-[:ESCRIBIO]-(u:Usuario)
+
+            RETURN
+                c.IDComentario AS id,
+                parent.IDComentario AS parent_id,
+                c.Comentario AS text,
+                u.Nombre AS author,
+                c.FechaCreacion AS created,
+                length(path) AS level
+
+            ORDER BY id
+            """,
             pid=post_id,
         )
+
         return [r.data() for r in res]

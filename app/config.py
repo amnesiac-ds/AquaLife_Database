@@ -7,11 +7,19 @@ BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 SQL_DIR = ROOT_DIR/'sql'
 
+
 # ===================== Neo4j =====================
 NEO4J_URI = "bolt://localhost:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "password"
 # =================================================
+
+# ===================== MongoDB =====================
+MONGO_URI = "mongodb://admin:password@localhost:27017"
+MONGO_DB = "AquaLifeDoc"
+MONGO_COLLECTION = "fichas_especie"
+# =================================================
+
 
 CATALOG_NAMES = [
 	'Termometro de la comunidad',
@@ -19,11 +27,9 @@ CATALOG_NAMES = [
 	'Perfil demografico de la comunidad',
 	'Tendencias de contribucion segun el tipo de agua',
 	'Vendedores mejor calificados',
-	'Análisis de influencers y su impacto en ventas',
-	'Detección de patrones de comportamiento anómalo en vendedores',
 ]
 
-CATALOG_QUERY = ['3_'+x+'.sql' for x in 'abcdehi']
+CATALOG_QUERY = ['3_'+x+'.sql' for x in 'abcde']
 
 CATALOG = defaultdict(str)
 
