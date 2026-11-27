@@ -27,9 +27,11 @@ CATALOG_NAMES = [
 	'Perfil demografico de la comunidad',
 	'Tendencias de contribucion segun el tipo de agua',
 	'Vendedores mejor calificados',
+	'Top influencers, especies, lift y conversion',
+	'Deteccion de patrones anomalo vendedores',
 ]
 
-CATALOG_QUERY = ['3_'+x+'.sql' for x in 'abcde']
+CATALOG_QUERY = ['3_'+x+'.sql' for x in 'abcdehi']
 
 CATALOG = defaultdict(str)
 
